@@ -2,8 +2,8 @@ name: 'Simple Slack Notification'
 description: 'Sends test results and GitHub run link to Slack'
 
 inputs:
-  slack-webhook-url:
-    description: 'The Slack Webhook URL' # Added this
+  slack-bot-token:
+    description: 'The xoxb token from your Slack App'
     required: true
   slack-thread-url:
     description: 'The Slack thread URL to reply to' # Added this
