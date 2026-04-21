@@ -1,0 +1,76 @@
+name: 'Simple Slack Notification'
+description: 'Sends test results and GitHub run link to Slack'
+
+inputs:
+  slack-webhook-url:
+    description: 'The Slack Webhook URL' # Added this
+    required: true
+  slack-thread-url:
+    description: 'The Slack thread URL to reply to' # Added this
+    required: false
+    default: ''
+  test-result:
+    description: 'The result of the test (success or failure)' # Added this
+    required: true
+  feature-name:
+    description: 'The name of the feature tested' # Added this
+    required: true
+  passed:
+    description: 'Number of passed scenarios' # Added this
+    required: true
+  failed:
+    description: 'Number of failed scenarios' # Added this
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - name: Prepare and Send Payload
+      shell: bash
+      run: |
+        # 1. Parse Thread TS from the URL
+        THREAD_TS=""
+        SLACK_URL="${{ inputs.slack-thread-url }}"
+        if [ -n "$SLACK_URL" ]; then
+          TS_RAW=$(basename "$SLACK_URL" | sed 's/^p//')
+          THREAD_TS=$(echo "$TS_RAW" | sed 's/^\([0-9]\{10\}\)/\1./')
+        fi
+
+        # 2. Set Emoji based on result
+        EMOJI=":large_green_circle:"
+        if [ "${{ inputs.test-result }}" == "failure" ]; then
+          EMOJI=":red_circle:"
+        fi
+
+        # 3. Build the payload for the Web API
+        # Note: chat.postMessage uses "channel" instead of a webhook URL
+        # We will use the channel ID parsed from the thread URL
+          CHANNEL_ID=$(echo "${{ inputs.slack-thread-url }}" | cut -d'/' -f5)
+          
+          PAYLOAD=$(jq -n \
+          --arg channel "$CHANNEL_ID" \
+          --arg emoji "$EMOJI" \
+          --arg feature "${{ inputs.feature-name }}" \
+          --arg passed "${{ inputs.passed }}" \
+          --arg failed "${{ inputs.failed }}" \
+          --arg url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+          --arg ts "$THREAD_TS" \
+          '{
+            "channel": $channel,
+            "text": "\($emoji) Test Results: \($feature)",
+            "blocks": [
+              {
+                "type": "section",
+                "text": {
+                  "type": "mrkdwn",
+                  "text": "*\($emoji) Regression Summary: \($feature)*\n• *Passed:* \($passed)\n• *Failed:* \($failed)\n\n<\($url)|View GitHub Action Run>"
+                }
+              }
+            ]
+          } | if $ts != "" then . + {thread_ts: $ts} else . end')
+        
+        # 2. Send to Slack API using the BOT TOKEN
+        curl -X POST -H 'Content-type: application/json; charset=utf-8' \
+          -H "Authorization: Bearer ${{ inputs.slack-bot-token }}" \
+          --data "$PAYLOAD" \
+          https://slack.com/api/chat.postMessage

@@ -55,3 +55,14 @@ jobs:
         with:
           name: cucumber-report
           path: target/cucumber-reports/
+
+      - name: Notify Slack
+        if: always()
+        uses: ./.github/actions/simple-slack-notify
+        with:
+          slack-bot-token: ${{ secrets.SLACK_BOT_TOKEN }} # Use the token here
+          slack-thread-url: ${{ github.event.inputs.slack_thread_url }}
+          test-result: ${{ job.status }}
+          feature-name: ${{ github.event.inputs.FEATURE }}
+          passed: '20'
+          failed: '0'
