@@ -58,7 +58,7 @@ jobs:
 
       - name: Notify Slack
         if: always()
-        uses: ./.github/actions/simple-slack-notify
+        uses: ./.github/actions/slack-notify
         with:
           slack-bot-token: ${{ secrets.SLACK_BOT_TOKEN }} # Use the token here
           slack-thread-url: ${{ github.event.inputs.slack_thread_url }}
