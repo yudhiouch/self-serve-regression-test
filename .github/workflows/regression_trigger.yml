@@ -1,21 +1,30 @@
 name: Manual Selenium Cucumber Test
 
 on:
-  # Allows manual trigger from the Actions tab
   workflow_dispatch:
     inputs:
-      tags:
-        description: 'Cucumber tags to run (e.g. @Login)'
+      FEATURE:
+        description: 'Feature to test'
         required: true
-        default: '@Login'
-      browser:
-        description: 'Browser to use'
+        type: string
+      TITLE:
+        description: 'The title from Slack'
+        required: false
+        type: string
+      PD_COMMIT:
+        description: 'PD Commit SHA'
+        required: false
+        default: 'N/A'
+        type: string
+      BIZ_COMMIT:
+        description: 'Biz Commit SHA'
+        required: false
+        default: 'N/A'
+        type: string
+      slack_thread_url:
+        description: 'The URL for the Slack thread'
         required: true
-        default: 'chrome'
-        type: choice
-        options:
-          - chrome
-          - firefox
+        type: string
 
   # Keep automatic trigger for pushes if you want (optional)
   push:
