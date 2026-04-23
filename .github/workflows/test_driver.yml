@@ -49,21 +49,40 @@ jobs:
           REPORT_PATH="target/cucumber-report/cucumber.json"
           
           if [ -f "$REPORT_PATH" ]; then
-          echo "Found report at $REPORT_PATH"
+            echo "Found report at $REPORT_PATH"
           
-          # 1. Count Passed: Scenarios where NO step has a status other than "passed"
-          PASSED=$(jq '[.[] | .elements[]? | select(.type == "scenario") | select(.steps | map(.result.status == "passed") | all)] | length' $REPORT_PATH)
+            # Use Python to parse the JSON reliably
+            RESULTS=$(python3 -c "
+            import json
+            try:
+                with open('$REPORT_PATH') as f:
+                    data = json.load(f)
+                passed = 0
+                failed = 0
+                for feature in data:
+                    for element in feature.get('elements', []):
+                        if element.get('type') == 'scenario':
+                            # Check if all steps in the scenario passed
+                            statuses = [step.get('result', {}).get('status') for step in element.get('steps', [])]
+                            if all(s == 'passed' for s in statuses):
+                                passed += 1
+                            elif any(s == 'failed' for s in statuses):
+                                failed += 1
+                print(f'{passed},{failed}')
+            except Exception as e:
+                print('0,0')
+            ")
           
-          # 2. Count Failed: Scenarios where AT LEAST ONE step has a status of "failed"
-          FAILED=$(jq '[.[] | .elements[]? | select(.type == "scenario") | select(.steps | map(.result.status == "failed") | any)] | length' $REPORT_PATH)
+            PASSED=$(echo $RESULTS | cut -d',' -f1)
+            FAILED=$(echo $RESULTS | cut -d',' -f2)
           
-          echo "passed=$PASSED" >> $GITHUB_OUTPUT
-          echo "failed=$FAILED" >> $GITHUB_OUTPUT
-          echo "Results -> Passed: $PASSED, Failed: $FAILED"
+            echo "passed=$PASSED" >> $GITHUB_OUTPUT
+            echo "failed=$FAILED" >> $GITHUB_OUTPUT
+            echo "Results -> Passed: $PASSED, Failed: $FAILED"
           else
-          echo "Report NOT found!"
-          echo "passed=0" >> $GITHUB_OUTPUT
-          echo "failed=0" >> $GITHUB_OUTPUT
+            echo "Report NOT found!"
+            echo "passed=0" >> $GITHUB_OUTPUT
+            echo "failed=0" >> $GITHUB_OUTPUT
           fi
 
       - name: Upload Cucumber Report Artifacts
