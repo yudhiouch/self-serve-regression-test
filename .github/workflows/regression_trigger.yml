@@ -1,4 +1,5 @@
 name: Manual Selenium Cucumber Test
+run-name: Regression - ${{ inputs.FEATURE }}
 
 on:
   workflow_dispatch:
@@ -7,6 +8,7 @@ on:
         description: 'Feature to test'
         required: true
         type: string
+        default: "all"
       TITLE:
         description: 'The title from Slack'
         required: false
@@ -31,38 +33,69 @@ on:
     branches: [ main ]
 
 jobs:
-  test:
+  # 1. SWAP FEATURE
+  test_swap:
+    if: ${{ inputs.FEATURE == 'all' || inputs.FEATURE == 'swap' }}
+    uses: ./.github/workflows/test_driver.yml
+    with:
+      tags: '@Login-1'
+      report_name: 'swap-report'
+
+  # 2. TRANSFER OUT FEATURE
+  test_transfer_out:
+    if: ${{ inputs.FEATURE == 'all' || inputs.FEATURE == 'transfer out' }}
+    uses: ./.github/workflows/test_driver.yml
+    with:
+      tags: '@Login-2'
+      report_name: 'transfer-out-report'
+
+  # 3. TRANSFER IN FEATURE
+  test_transfer_in:
+    if: ${{ inputs.FEATURE == 'all' || inputs.FEATURE == 'transfer in' }}
+    uses: ./.github/workflows/test_driver.yml
+    with:
+      tags: '@Login-3'
+      report_name: 'transfer-out-report'
+
+  # 4. GENERAL (Runs only on 'all')
+  test_general:
+    if: ${{ inputs.FEATURE == 'all' }}
+    uses: ./.github/workflows/test_driver.yml
+    with:
+      tags: '@login'
+      report_name: 'general-report'
+
+  # 4. FINAL NOTIFICATION
+  notify:
+    needs: [ test_swap, test_transfer_out, test_transfer_in, test_general ]
+    if: always()
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-
-      - name: Set up JDK
-        uses: actions/setup-java@v4
-        with:
-          java-version: '17'
-          distribution: 'temurin'
-          cache: 'maven'
-
-      - name: Run Cucumber Tests
-        # We use the ${{ github.event.inputs.tags }} to pass the UI input to Maven
+      - name: Prepare Slack Data
+        id: data
         run: |
-          mvn test -Dcucumber.filter.tags="${{ github.event.inputs.tags || '@Login' }}"
+          # Combine outputs from all jobs. Only the one that ran will have a value.
+          P_SWAP="${{ needs.test_swap.outputs.passed }}"
+          P_TRANSFER_OUT="${{ needs.test_transfer_out.outputs.passed }}"
+          P_TRANSFER_IN="${{ needs.test_transfer_in.outputs.passed }}"
+          
+          F_SWAP="${{ needs.test_swap.outputs.failed }}"
+          F_TRANSFER_OUT="${{ needs.test_transfer_out.outputs.failed }}"
+          F_TRANSFER_IN="${{ needs.test_transfer_in.outputs.failed }}"
+          
+          # Use basic addition for the results
+          TOTAL_PASSED=$(( ${P_SWAP:-0} + ${P_TRANSFER_OUT:-0} + ${P_TRANSFER_IN:-0}))
+          TOTAL_FAILED=$(( ${F_SWAP:-0} + ${F_TRANSFER_OUT:-0} + ${F_TRANSFER_IN:-0}))
+          
+          echo "passed=$TOTAL_PASSED" >> $GITHUB_OUTPUT
+          echo "failed=$TOTAL_FAILED" >> $GITHUB_OUTPUT
 
-      - name: Upload Report
-        if: always()
-        uses: actions/upload-artifact@v4
+      - name: Send Slack Summary
+        uses: ./.github/actions/simple-slack-notify
         with:
-          name: cucumber-report
-          path: target/cucumber-reports/
-
-      - name: Notify Slack
-        if: always()
-        uses: ./.github/actions/slack-notify
-        with:
-          slack-bot-token: ${{ secrets.SLACK_BOT_TOKEN }} # Use the token here
+          slack-bot-token: ${{ secrets.SLACK_BOT_TOKEN }}
           slack-thread-url: ${{ github.event.inputs.slack_thread_url }}
-          test-result: ${{ job.status }}
+          test-result: ${{ (contains(needs.*.result, 'failure') || steps.data.outputs.failed > 0) && 'failure' || 'success' }}
           feature-name: ${{ github.event.inputs.FEATURE }}
-          passed: '20'
-          failed: '0'
+          passed: ${{ steps.data.outputs.passed }}
+          failed: ${{ steps.data.outputs.failed }}

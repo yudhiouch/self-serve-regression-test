@@ -1,0 +1,69 @@
+name: Test Driver
+on:
+  workflow_call:
+    inputs:
+      tags:
+        required: true
+        type: string
+      report_name:
+        required: true
+        type: string
+    outputs:
+      passed:
+        description: "Number of passed scenarios"
+        value: ${{ jobs.run_maven_test.outputs.passed }}
+      failed:
+        description: "Number of failed scenarios"
+        value: ${{ jobs.run_maven_test.outputs.failed }}
+
+jobs:
+  run_maven_test:
+    runs-on: ubuntu-latest
+    outputs:
+      passed: ${{ steps.summary.outputs.passed }}
+      failed: ${{ steps.summary.outputs.failed }}
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Run Cucumber Tests
+        id: maven_exec
+        continue-on-error: true
+        run: |
+          # Ensure the directory exists
+          mkdir -p target/cucumber-reports
+          mvn test -Dcucumber.filter.tags="${{ inputs.tags }}"
+
+      - name: Extract Test Summary
+        id: summary
+        if: always()
+        shell: bash
+        run: |
+          REPORT_PATH="target/cucumber-reports/cucumber.json"
+          
+          if [ -f "$REPORT_PATH" ]; then
+            # Count scenarios where all steps passed
+            PASSED=$(jq '[.[] | .elements[]? | select(.type == "scenario") | select(.steps[].result.status | all(. == "passed"))] | length' $REPORT_PATH)
+            # Count scenarios where at least one step failed
+            FAILED=$(jq '[.[] | .elements[]? | select(.type == "scenario") | select(.steps[].result.status | any(. == "failed"))] | length' $REPORT_PATH)
+          
+            echo "passed=$PASSED" >> $GITHUB_OUTPUT
+            echo "failed=$FAILED" >> $GITHUB_OUTPUT
+          else
+            echo "passed=0" >> $GITHUB_OUTPUT
+            echo "failed=0" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Upload Cucumber Report Artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.report_name }}
+          path: target/cucumber-reports/
