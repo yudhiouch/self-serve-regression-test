@@ -71,6 +71,8 @@ jobs:
     if: always()
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
       - name: Prepare Slack Data
         id: data
         run: |
