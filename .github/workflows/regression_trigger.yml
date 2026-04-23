@@ -35,7 +35,7 @@ on:
 jobs:
   # 1. SWAP FEATURE
   test_swap:
-    if: ${{ inputs.FEATURE == 'all' || inputs.FEATURE == 'swap' }}
+    if: ${{ inputs.FEATURE == 'swap' }}
     uses: ./.github/workflows/test_driver.yml
     with:
       tags: '@Login-1'
@@ -43,7 +43,7 @@ jobs:
 
   # 2. TRANSFER OUT FEATURE
   test_transfer_out:
-    if: ${{ inputs.FEATURE == 'all' || inputs.FEATURE == 'transfer out' }}
+    if: ${{ inputs.FEATURE == 'transfer out' }}
     uses: ./.github/workflows/test_driver.yml
     with:
       tags: '@Login-2'
@@ -51,11 +51,11 @@ jobs:
 
   # 3. TRANSFER IN FEATURE
   test_transfer_in:
-    if: ${{ inputs.FEATURE == 'all' || inputs.FEATURE == 'transfer in' }}
+    if: ${{ inputs.FEATURE == 'transfer in' }}
     uses: ./.github/workflows/test_driver.yml
     with:
       tags: '@Login-3'
-      report_name: 'transfer-out-report'
+      report_name: 'transfer-in-report'
 
   # 4. GENERAL (Runs only on 'all')
   test_general:
@@ -91,7 +91,7 @@ jobs:
           echo "failed=$TOTAL_FAILED" >> $GITHUB_OUTPUT
 
       - name: Send Slack Summary
-        uses: ./.github/actions/simple-slack-notify
+        uses: ./.github/actions/slack-notify
         with:
           slack-bot-token: ${{ secrets.SLACK_BOT_TOKEN }}
           slack-thread-url: ${{ github.event.inputs.slack_thread_url }}
