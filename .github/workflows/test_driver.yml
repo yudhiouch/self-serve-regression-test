@@ -46,26 +46,29 @@ jobs:
         if: always()
         shell: bash
         run: |
-          # Match your Java config: target/cucumber-report/cucumber.json
           REPORT_PATH="target/cucumber-report/cucumber.json"
           
           if [ -f "$REPORT_PATH" ]; then
           echo "Found report at $REPORT_PATH"
-          # Logic to extract counts
-          PASSED=$(jq '[.[] | .elements[]? | select(.type == "scenario") | select(.steps[].result.status | all(. == "passed"))] | length' $REPORT_PATH)
-          FAILED=$(jq '[.[] | .elements[]? | select(.type == "scenario") | select(.steps[].result.status | any(. == "failed"))] | length' $REPORT_PATH)
+          
+          # 1. Count Passed: Scenarios where NO step has a status other than "passed"
+          PASSED=$(jq '[.[] | .elements[]? | select(.type == "scenario") | select(.steps | map(.result.status == "passed") | all)] | length' $REPORT_PATH)
+          
+          # 2. Count Failed: Scenarios where AT LEAST ONE step has a status of "failed"
+          FAILED=$(jq '[.[] | .elements[]? | select(.type == "scenario") | select(.steps | map(.result.status == "failed") | any)] | length' $REPORT_PATH)
           
           echo "passed=$PASSED" >> $GITHUB_OUTPUT
           echo "failed=$FAILED" >> $GITHUB_OUTPUT
+          echo "Results -> Passed: $PASSED, Failed: $FAILED"
           else
-          echo "Report NOT found at $REPORT_PATH"
+          echo "Report NOT found!"
           echo "passed=0" >> $GITHUB_OUTPUT
           echo "failed=0" >> $GITHUB_OUTPUT
           fi
 
-          - name: Upload Cucumber Report Artifacts
-            if: always()
-            uses: actions/upload-artifact@v4
-            with:
-              name: ${{ inputs.report_name }}
-              path: target/cucumber-report/ # Matches your Java path
+      - name: Upload Cucumber Report Artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.report_name }}
+          path: target/cucumber-report/ # Matches your Java path
