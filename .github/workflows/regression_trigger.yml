@@ -73,21 +73,25 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+
       - name: Prepare Slack Data
         id: data
         run: |
-          # Combine outputs from all jobs. Only the one that ran will have a value.
+          # 1. Fetch outputs from ALL potential jobs
           P_SWAP="${{ needs.test_swap.outputs.passed }}"
-          P_TRANSFER_OUT="${{ needs.test_transfer_out.outputs.passed }}"
-          P_TRANSFER_IN="${{ needs.test_transfer_in.outputs.passed }}"
+          P_TOUT="${{ needs.test_transfer_out.outputs.passed }}"
+          P_TIN="${{ needs.test_transfer_in.outputs.passed }}"
+          P_GEN="${{ needs.test_general.outputs.passed }}"
           
           F_SWAP="${{ needs.test_swap.outputs.failed }}"
-          F_TRANSFER_OUT="${{ needs.test_transfer_out.outputs.failed }}"
-          F_TRANSFER_IN="${{ needs.test_transfer_in.outputs.failed }}"
+          F_TOUT="${{ needs.test_transfer_out.outputs.failed }}"
+          F_TIN="${{ needs.test_transfer_in.outputs.failed }}"
+          F_GEN="${{ needs.test_general.outputs.failed }}"
           
-          # Use basic addition for the results
-          TOTAL_PASSED=$(( ${P_SWAP:-0} + ${P_TRANSFER_OUT:-0} + ${P_TRANSFER_IN:-0}))
-          TOTAL_FAILED=$(( ${F_SWAP:-0} + ${F_TRANSFER_OUT:-0} + ${F_TRANSFER_IN:-0}))
+          # 2. Math logic: Use ${VAR:-0} to treat empty/skipped jobs as 0
+          # This ensures we don't get '1 +  + 0' which breaks bash math
+          TOTAL_PASSED=$(( ${P_SWAP:-0} + ${P_TOUT:-0} + ${P_TIN:-0} + ${P_GEN:-0} ))
+          TOTAL_FAILED=$(( ${F_SWAP:-0} + ${F_TOUT:-0} + ${F_TIN:-0} + ${F_GEN:-0} ))
           
           echo "passed=$TOTAL_PASSED" >> $GITHUB_OUTPUT
           echo "failed=$TOTAL_FAILED" >> $GITHUB_OUTPUT

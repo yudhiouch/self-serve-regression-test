@@ -37,8 +37,7 @@ jobs:
         id: maven_exec
         continue-on-error: true
         run: |
-          # Ensure the directory exists
-          mkdir -p target/cucumber-reports
+          mkdir -p target/cucumber-report
           mvn test -Dcucumber.filter.tags="${{ inputs.tags }}"
 
       - name: Extract Test Summary
@@ -51,24 +50,20 @@ jobs:
           if [ -f "$REPORT_PATH" ]; then
             echo "Found report at $REPORT_PATH"
           
-            # 1. Extract scenario blocks and check their step statuses
-            # We look for the "status" field. 
-            # In Cucumber JSON, scenarios are grouped. We'll count the keyword "passed" 
-            # and "failed" within the result blocks.
+            # SCENARIO COUNT LOGIC:
+            # We filter for 'scenario' type, then check if ALL steps passed
+            PASSED=$(jq '[.[] | .elements[]? | select(.type=="scenario") | select(.steps | map(.result.status == "passed") | all)] | length' "$REPORT_PATH" | tr -d '[:space:]')
           
-            # Note: This is a simplified count based on step results
-            PASSED_STEPS=$(grep -o '"status": "passed"' "$REPORT_PATH" | wc -l || echo 0)
-            FAILED_STEPS=$(grep -o '"status": "failed"' "$REPORT_PATH" | wc -l || echo 0)
+            # We filter for 'scenario' type, then check if ANY step failed
+            FAILED=$(jq '[.[] | .elements[]? | select(.type=="scenario") | select(.steps | map(.result.status == "failed") | any)] | length' "$REPORT_PATH" | tr -d '[:space:]')
 
-            # If you want to count SCENARIOS specifically (more accurate):
-            # We use jq but with a much simpler filter that avoids the iteration error
-            PASSED=$(jq '[.[] | .elements[]? | select(.type=="scenario") | .steps[].result.status] | group_by(.) | .[] | select(.[0]=="passed") | length' "$REPORT_PATH" || echo 0)
-            FAILED=$(jq '[.[] | .elements[]? | select(.type=="scenario") | .steps[].result.status] | group_by(.) | .[] | select(.[0]=="failed") | length' "$REPORT_PATH" || echo 0)
+            # Ensure we default to 0 if variables are empty
+            VAL_P=${PASSED:-0}
+            VAL_F=${FAILED:-0}
 
-            # Final safety check: if jq fails, default to 0
-            echo "passed=${PASSED:-0}" >> $GITHUB_OUTPUT
-            echo "failed=${FAILED:-0}" >> $GITHUB_OUTPUT
-            echo "Results -> Passed: ${PASSED:-0}, Failed: ${FAILED:-0}"
+            echo "passed=$VAL_P" >> $GITHUB_OUTPUT
+            echo "failed=$VAL_F" >> $GITHUB_OUTPUT
+            echo "Results -> Passed: $VAL_P, Failed: $VAL_F"
           else
             echo "Report NOT found!"
             echo "passed=0" >> $GITHUB_OUTPUT
@@ -80,4 +75,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.report_name }}
-          path: target/cucumber-report/ # Matches your Java path
+          path: target/cucumber-report/
