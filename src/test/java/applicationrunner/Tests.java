@@ -12,7 +12,7 @@ import org.testng.annotations.DataProvider;
         "junit:target/cucumber-report/cucumber.xml"
 },
         features = "src/test/resources/features",
-        glue = "stepdefinitions",
+        glue = "stepDefinitions",
         tags = "@Login"
 )
 public class Tests extends AbstractTestNGCucumberTests {
